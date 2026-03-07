@@ -1,0 +1,2 @@
+# build_sdm845_kernel
+尝试为一加6/6t的aviumui内核添加kernelsu支持
