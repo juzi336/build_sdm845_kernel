@@ -40,7 +40,7 @@ jobs:
       run: |
         git clone --depth=1 ${{ env.KERNEL_SRC }} -b ${{ env.KERNEL_BRANCH }} $GITHUB_WORKSPACE/kernel_workspace/android-kernel
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+        curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
         patch -p1 -F 3 <  $GITHUB_WORKSPACE/patches/scope_min_manual_hooks_v1.6.patch
         sed -i 's/ -dirty//g' scripts/setlocalversion
 
