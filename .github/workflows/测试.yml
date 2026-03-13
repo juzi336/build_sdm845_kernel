@@ -1,0 +1,71 @@
+name: Build Avium Kernel
+
+on:
+  workflow_dispatch:
+
+env:
+  CLANG_VERSION: r563880c
+  KERNEL_SRC: https://github.com/juzi336/kernel_oneplus_sdm845
+  KERNEL_BRANCH: avium-16.2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 环境准备
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git bc build-essential flex bison libssl-dev libelf-dev clang lld llvm python3 zip
+        
+    - name: 检出本地代码 (获取补丁)
+      uses: actions/checkout@v4
+
+    - name: 缓存 Clang
+      id: cache-clang
+      uses: actions/cache@v5
+      with:
+        path: ${{ github.workspace }}/kernel_workspace/clang-aosp
+        key: ${{ env.CLANG_VERSION }}
+
+    - name: 下载 Clang
+      if: steps.cache-clang.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/kernel_workspace
+        cd $GITHUB_WORKSPACE/kernel_workspace
+        mkdir -p clang-aosp
+        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-${{ env.CLANG_VERSION }}.tar.gz
+        tar -C clang-aosp -xf clang-${{ env.CLANG_VERSION }}.tar.gz
+
+    - name: 检出源码
+      run: |
+        git clone --depth=1 ${{ env.KERNEL_SRC }} -b ${{ env.KERNEL_BRANCH }} $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+        curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+        bash $GITHUB_WORKSPACE/patches/test.sh
+        sed -i 's/ -dirty//g' scripts/setlocalversion
+
+    - name: 编译内核
+      run: |
+        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+        export PATH="$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$PATH"
+        export KBUILD_BUILD_HOST=coolapk
+        export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
+        MAKE_ARGS="ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang LD=ld.lld CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS=-w"
+        make O=out $MAKE_ARGS vendor/sdm845-perf_defconfig vendor/enchilada_defconfig
+        make -j$(nproc --all) O=out $MAKE_ARGS
+
+    - name: 打包 AnyKernel3
+      run: |
+        cd $GITHUB_WORKSPACE/kernel_workspace
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3
+        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
+        sed -i 's!BLOCK=.*!BLOCK=auto;!g' AnyKernel3/anykernel.sh
+        sed -i 's/IS_SLOT_DEVICE=0;/IS_SLOT_DEVICE=auto;/g' AnyKernel3/anykernel.sh
+        cp android-kernel/out/arch/arm64/boot/Image AnyKernel3/
+        cd AnyKernel3 && zip -r ../Avium-Kernel-SDM845.zip ./*
+
+    - name: 上传刷机包
+      uses: actions/upload-artifact@v4
+      with:
+        name: Avium-Kernel-ZIP
+        path: kernel_workspace/Avium-Kernel-SDM845.zip
