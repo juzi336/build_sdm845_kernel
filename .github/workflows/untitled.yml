@@ -1,0 +1,56 @@
+name: Build Xiaomi SM8450 Kernel
+
+on:
+  workflow_dispatch:
+
+env:
+  CLANG_VERSION: r563880c
+  KERNEL_SRC: https://github.com/LineageOS/android_kernel_xiaomi_sm8450
+  MODULES_SRC: https://github.com/LineageOS/android_kernel_xiaomi_sm8450-modules
+  DT_SRC: https://github.com/LineageOS/android_kernel_xiaomi_sm8450-devicetrees
+  BRANCH: lineage-23.2
+  KERNEL_DEFCONFIG: gki_defconfig vendor/xiaomi_GKI.config vendor/marble_GKI.config
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 准备环境
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git bc build-essential flex bison libssl-dev libelf-dev clang lld llvm python3 zip
+
+    - name: 编译器缓存
+      id: cache-clang
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/clang-aosp
+        key: clang-${{ env.CLANG_VERSION }}
+
+    - name: 下载 Clang (r563880c)
+      if: steps.cache-clang.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p ${{ github.workspace }}/clang-aosp
+        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-${{ env.CLANG_VERSION }}.tar.gz
+        tar -C ${{ github.workspace }}/clang-aosp -xf clang-${{ env.CLANG_VERSION }}.tar.gz
+
+    - name: 检出源码
+      run: |
+        git clone --depth=1 ${{ env.KERNEL_SRC }} -b ${{ env.BRANCH }} sm8450
+        git clone --depth=1 ${{ env.MODULES_SRC }} -b ${{ env.BRANCH }} sm8450-modules
+        git clone --depth=1 ${{ env.DT_SRC }} -b ${{ env.BRANCH }} sm8450-devicetrees
+
+    - name: 编译内核
+      run: |
+        cd sm8450
+        export PATH="${{ github.workspace }}/clang-aosp/bin:$PATH"
+        
+        MAKE_ARGS="ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang LD=ld.lld CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS=-w"
+        make O=out $MAKE_ARGS ${{ env.KERNEL_DEFCONFIG }}
+        make -j$(nproc --all) O=out $MAKE_ARGS
+
+    - name: 上传产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: Xiaomi-Marble-Image
+        path: sm8450/out/arch/arm64/boot/Image
