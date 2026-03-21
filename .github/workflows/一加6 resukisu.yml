@@ -1,4 +1,4 @@
-name: Build Avium Kernel test
+name: Build Avium Kernel with resukisu
 
 on:
   workflow_dispatch:
