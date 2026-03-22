@@ -46,13 +46,16 @@ jobs:
         git clone --depth=1 ${{ env.DT_SRC }} -b ${{ env.BRANCH }} sm8450-devicetrees
         cd sm8450
         curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+        cd
         cd patch
         cp ./kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch sm8450/KernelSU/
         cp ./kernel_patches/50_add_susfs_in_kernel-<kernel_version>.patch sm8450/
         cp ./kernel_patches/fs/* sm8450/fs/
         cp ./kernel_patches/include/linux/* sm8450/include/linux/
+        cd
         cd sm8450/KernelSU
         patch -p1 < 10_enable_susfs_for_ksu.patch
+        cd
         cd sm8450
         patch -p1 < 50_add_susfs_in_kernel.patch
         
