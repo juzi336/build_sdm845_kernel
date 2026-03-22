@@ -40,7 +40,7 @@ jobs:
 
     - name: 检出源码
       run: |
-        git clone -b gki-android12-5.10 git@gitlab.com:simonpunk/susfs4ksu.git patch
+        git clone gitlab.com/simonpunk/susfs4ksu -b gki-android12-5.10 patch
         git clone --depth=1 ${{ env.KERNEL_SRC }} -b ${{ env.BRANCH }} sm8450
         git clone --depth=1 ${{ env.MODULES_SRC }} -b ${{ env.BRANCH }} sm8450-modules
         git clone --depth=1 ${{ env.DT_SRC }} -b ${{ env.BRANCH }} sm8450-devicetrees
