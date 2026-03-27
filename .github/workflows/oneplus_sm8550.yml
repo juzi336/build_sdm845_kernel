@@ -41,7 +41,7 @@ jobs:
     - name: 检出源码
       run: |
         cd $GITHUB_WORKSPACE
-        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b android13-5.15 patch
+        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15 patch
         git clone --depth=1 ${{ env.KERNEL_SRC }} -b ${{ env.BRANCH }} sm8550
         git clone --depth=1 ${{ env.MODULES_SRC }} -b ${{ env.BRANCH }} sm8550-modules
         echo "CONFIG_KSU=y" >> $GITHUB_WORKSPACE/sm8550/arch/arm64/configs/gki_defconfig
@@ -51,12 +51,12 @@ jobs:
         curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
         sed -i 's/ -dirty//g' scripts/setlocalversion
         
-        cp $GITHUB_WORKSPACE/patch/kernel_patches/50_add_susfs_in_android13-5.15.patch $GITHUB_WORKSPACE/sm8550/
+        cp $GITHUB_WORKSPACE/patch/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch $GITHUB_WORKSPACE/sm8550/
         cp $GITHUB_WORKSPACE/patch/kernel_patches/fs/* $GITHUB_WORKSPACE/sm8550/fs/
         cp $GITHUB_WORKSPACE/patch/kernel_patches/include/linux/* $GITHUB_WORKSPACE/sm8550/include/linux/
         
         cd $GITHUB_WORKSPACE/sm8550
-        patch -p1 < 50_add_susfs_in_android13-5.15.patch
+        patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch
 
     - name: 编译内核
       run: |
