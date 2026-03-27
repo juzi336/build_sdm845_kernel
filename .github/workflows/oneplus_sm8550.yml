@@ -1,0 +1,90 @@
+name: Build OnePlus SM8550 Kernel
+
+on:
+  workflow_dispatch:
+
+env:
+  CLANG_VERSION: r563880c
+  KERNEL_SRC: https://github.com/LineageOS/android_kernel_oneplus_sm8550
+  MODULES_SRC: https://github.com/LineageOS/android_kernel_oneplus_sm8550-modules
+  BRANCH: lineage-23.2
+  KERNEL_DEFCONFIG: gki_defconfig vendor/kalama_GKI.config vendor/oplus/kalama_GKI.config vendor/debugfs.config
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup SWAP
+      uses: pierotofy/set-swap-space@master
+      with:
+          swap-size-gb: 16
+          
+    - name: 准备环境
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git bc build-essential flex bison libssl-dev libelf-dev clang lld llvm python3 zip
+
+    - name: 编译器缓存
+      id: cache-clang
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/clang-aosp
+        key: clang-${{ env.CLANG_VERSION }}
+
+    - name: 下载 Clang (r563880c)
+      if: steps.cache-clang.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p ${{ github.workspace }}/clang-aosp
+        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android16-qpr2-release/clang-${{ env.CLANG_VERSION }}.tar.gz
+        tar -C ${{ github.workspace }}/clang-aosp -xf clang-${{ env.CLANG_VERSION }}.tar.gz
+
+    - name: 检出源码
+      run: |
+        cd $GITHUB_WORKSPACE
+        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b android13-5.15 patch
+        git clone --depth=1 ${{ env.KERNEL_SRC }} -b ${{ env.BRANCH }} sm8550
+        git clone --depth=1 ${{ env.MODULES_SRC }} -b ${{ env.BRANCH }} sm8550-modules
+        echo "CONFIG_KSU=y" >> $GITHUB_WORKSPACE/sm8550/arch/arm64/configs/gki_defconfig
+        echo "CONFIG_KSU_SUSFS=y" >> $GITHUB_WORKSPACE/sm8550/arch/arm64/configs/gki_defconfig
+        
+        cd $GITHUB_WORKSPACE/sm8550
+        curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+        sed -i 's/ -dirty//g' scripts/setlocalversion
+        
+        cp $GITHUB_WORKSPACE/patch/kernel_patches/50_add_susfs_in_android13-5.15.patch $GITHUB_WORKSPACE/sm8550/
+        cp $GITHUB_WORKSPACE/patch/kernel_patches/fs/* $GITHUB_WORKSPACE/sm8550/fs/
+        cp $GITHUB_WORKSPACE/patch/kernel_patches/include/linux/* $GITHUB_WORKSPACE/sm8550/include/linux/
+        
+        cd $GITHUB_WORKSPACE/sm8550
+        patch -p1 < 50_add_susfs_in_android13-5.15.patch
+
+    - name: 编译内核
+      run: |
+        cd sm8550
+        export PATH="${{ github.workspace }}/clang-aosp/bin:$PATH"
+        
+        MAKE_ARGS="ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang LD=ld.lld CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS=-w"
+        make O=out $MAKE_ARGS ${{ env.KERNEL_DEFCONFIG }}
+        make -j$(nproc --all) O=out $MAKE_ARGS
+
+    - name: 打包 AnyKernel3
+      run: |
+        cd $GITHUB_WORKSPACE
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3
+        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
+        sed -i 's!BLOCK=.*!BLOCK=auto;!g' AnyKernel3/anykernel.sh
+        sed -i 's/IS_SLOT_DEVICE=0;/IS_SLOT_DEVICE=auto;/g' AnyKernel3/anykernel.sh
+        cp sm8550/out/arch/arm64/boot/Image AnyKernel3/
+        cd AnyKernel3 && zip -r ../OnePlus-SM8550-Kernel.zip ./*
+
+    - name: 上传刷机包 (AnyKernel3)
+      uses: actions/upload-artifact@v4
+      with:
+        name: OnePlus-SM8550-Kernel-ZIP
+        path: ${{ github.workspace }}/OnePlus-SM8550-Kernel.zip
+
+    - name: 上传内核镜像
+      uses: actions/upload-artifact@v4
+      with:
+        name: OnePlus-SM8550-Image
+        path: sm8550/out/arch/arm64/boot/Image
