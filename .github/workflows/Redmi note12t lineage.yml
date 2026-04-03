@@ -7,7 +7,7 @@ env:
   CLANG_VERSION: r563880c
   KERNEL_SRC: https://github.com/LineageOS/android_kernel_xiaomi_sm8450
   BRANCH: lineage-23.2
-  KERNEL_DEFCONFIG: gki_defconfig vendor/xiaomi_GKI.config vendor/marble_GKI.config
+  KERNEL_DEFCONFIG: gki_defconfig vendor/xiaomi_GKI.config vendor/marble_GKI.config vendor/waipio_GKI.config vendor/debugfs.config
 
 jobs:
   build:
